@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>塾 宿題チェックリスト</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;background:#f5f5f0;color:#1a1a1a;padding-bottom:40px;}
+header{background:#fff;border-bottom:1px solid #e0e0d8;padding:12px 16px;position:sticky;top:0;z-index:100;}
+h1{font-size:16px;font-weight:600;margin-bottom:8px;}
+.filter-bar{display:flex;gap:6px;flex-wrap:wrap;}
+.fb{font-size:12px;padding:4px 12px;border-radius:20px;border:1px solid #ccc;background:#fff;color:#666;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.fb.on{background:#E6F1FB;color:#0C447C;border-color:#B5D4F4;font-weight:600;}
+.progress-row{display:flex;align-items:center;gap:8px;margin-top:8px;}
+.progress-bar{flex:1;height:6px;background:#e0e0d8;border-radius:3px;overflow:hidden;}
+.progress-fill{height:100%;background:#1D9E75;border-radius:3px;transition:width 0.3s;}
+.progress-text{font-size:12px;color:#666;white-space:nowrap;}
+.content{padding:12px 12px 0;}
+.section-label{font-size:11px;font-weight:600;color:#999;padding:8px 4px 2px;letter-spacing:0.05em;}
+.week{background:#fff;border:1px solid #e0e0d8;border-radius:12px;margin-bottom:10px;overflow:hidden;}
+.wh{display:flex;align-items:center;gap:8px;padding:11px 14px;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;}
+.wh.all-done{background:#E1F5EE;}
+.wdate{font-size:13px;font-weight:600;color:#1a1a1a;flex:1;}
+.wtags{display:flex;gap:4px;flex-wrap:wrap;align-items:center;}
+.tg{font-size:10px;padding:2px 7px;border-radius:10px;}
+.ts{background:#E6F1FB;color:#0C447C;}
+.tk{background:#FAEEDA;color:#633806;}
+.tt{background:#FCEBEB;color:#791F1F;}
+.ty{background:#F1EFE8;color:#444441;}
+.done-badge{font-size:10px;padding:2px 7px;border-radius:10px;background:#E1F5EE;color:#0F6E56;font-weight:600;}
+.remain-badge{font-size:10px;padding:2px 7px;border-radius:10px;background:#FCEBEB;color:#A32D2D;}
+.chev{font-size:11px;color:#aaa;transition:transform 0.2s;flex-shrink:0;margin-left:4px;}
+.wb{display:none;border-top:1px solid #e0e0d8;}
+.wb.open{display:block;}
+.col-head{display:grid;grid-template-columns:1fr 44px;background:#f9f9f6;padding:5px 0;}
+.col-head span{font-size:10px;color:#aaa;padding:0 12px;font-weight:600;}
+.col-head .ch-head{text-align:center;}
+.item-row{display:grid;grid-template-columns:1fr 44px;border-bottom:1px solid #f0f0ea;transition:background 0.15s;}
+.item-row:last-child{border-bottom:none;}
+.item-row.checked{background:#f0fbf6;}
+.item-row.extra{background:#f7f6ff;}
+.item-row.extra.checked{background:#f0fbf6;}
+.cell{padding:9px 12px;font-size:12px;line-height:1.6;}
+.subj{font-size:11px;font-weight:600;color:#333;display:block;margin-bottom:1px;}
+.item-row.checked .subj{color:#0F6E56;}
+.item-row.extra .subj{color:#3C3489;}
+.item-row.extra.checked .subj{color:#0F6E56;}
+.val{color:#555;font-size:12px;}
+.item-row.checked .val{color:#0F6E56;text-decoration:line-through;opacity:0.6;}
+.check-cell{display:flex;align-items:center;justify-content:center;padding:8px;}
+.ck{width:28px;height:28px;border-radius:50%;border:2px solid #ccc;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;transition:all 0.15s;flex-shrink:0;-webkit-tap-highlight-color:transparent;}
+.ck.done{background:#1D9E75;border-color:#1D9E75;color:#fff;}
+.notice{font-size:12px;color:#791F1F;background:#FCEBEB;padding:7px 12px;border-top:1px solid #f0e0e0;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📚 塾 宿題チェックリスト</h1>
+  <div class="filter-bar">
+    <button class="fb on" onclick="fil('all',this)">すべて</button>
+    <button class="fb" onclick="fil('sansu',this)">算数</button>
+    <button class="fb" onclick="fil('kokugo',this)">国語</button>
+    <button class="fb" onclick="fil('remaining',this)">未完了のみ</button>
+  </div>
+  <div class="progress-row">
+    <div class="progress-bar"><div class="progress-fill" id="prog-fill"></div></div>
+    <span class="progress-text" id="prog-text">0 / 0</span>
+  </div>
+</header>
+
+<div class="content" id="wc"></div>
+
+<script>
+const STORE_KEY='juku_checks_2026';
+let checks={};
+try{const s=localStorage.getItem(STORE_KEY);if(s)checks=JSON.parse(s);}catch(e){}
+function save(){try{localStorage.setItem(STORE_KEY,JSON.stringify(checks));}catch(e){}}
+
+const data=[
+  {id:"w0308",label:"3月8日（初回）",cats:["sansu","kokugo"],test:false,kyukou:false,
+   rows:[
+    {s:"算数テキスト 予習",v:"P2,3（第1回）／P8,9（第2回）"},
+    {s:"算数テキスト 宿題",v:"P7（第1回）／P13（第2回）"},
+    {s:"算数新演習 宿題",v:"なし（初回）"},
+    {s:"国語エフォート 宿題",v:"なし（初回）"},
+    {s:"国語サーパス 宿題",v:"なし（初回）"},
+   ],kanji:null},
+  {id:"w0316",label:"3月16日〜22日",cats:["sansu","kokugo"],test:false,kyukou:false,
+   rows:[
+    {s:"算数テキスト 予習",v:"P26,27（第5回）／P32,33（第6回）"},
+    {s:"算数テキスト 宿題",v:"P31（第5回）／P37（第6回）"},
+    {s:"算数新演習 宿題",v:"P12〜15（第2回）／P16〜19（第3回）"},
+    {s:"国語エフォート 宿題",v:"P10〜15（第2回）・漢字テスト1"},
+    {s:"国語サーパス 宿題",v:"P4〜13"},
+   ],kanji:"漢字テスト1の範囲"},
+  {id:"w0323",label:"3月23日〜29日",cats:["sansu","kokugo"],test:false,kyukou:false,
+   rows:[
+    {s:"算数テキスト 予習",v:"P14,15（第3回）／P20,21（第4回）"},
+    {s:"算数テキスト 宿題",v:"P19（第3回）／P25（第4回）"},
+    {s:"算数新演習 宿題",v:"P16〜19（第3回）／P20〜23（第4回）"},
+    {s:"国語エフォート 宿題",v:"P38〜45（第3回）・漢字テスト2／P30〜33（第4回）・漢字テスト3"},
+    {s:"国語サーパス 宿題",v:"P14〜17（第3回）／P18〜23（第4回）"},
+   ],kanji:"漢字テスト2・3の範囲"},
+  {id:"w0330",label:"3月30日〜4月5日",cats:["sansu","kokugo"],test:false,kyukou:false,
+   rows:[
+    {s:"算数テキスト 予習",v:"P38,39（第7回）／P44,45（第8回）"},
+    {s:"算数テキスト 宿題",v:"P43（第7回）／P53（第8回）"},
+    {s:"算数新演習 宿題",v:"P20〜23（第4回）／P24〜27（第5回）"},
+    {s:"国語エフォート 宿題",v:"P16〜19（第5回）・漢字テスト4"},
+    {s:"国語サーパス 宿題",v:"P24〜29（第5回）"},
+   ],kanji:"漢字テスト4の範囲"},
+  {id:"w0406",label:"4月6日〜12日",cats:["sansu","kokugo"],test:false,kyukou:false,notice:"提出日：4/6・4/12",
+   rows:[
+    {s:"算数テキスト 予習",v:"P54,55（第9回）／P60,61（第10回）"},
+    {s:"算数テキスト 宿題",v:"P59（第9回）／P65（第10回）"},
+    {s:"算数新演習 宿題",v:"P24〜27（第5回）"},
+    {s:"国語エフォート 宿題",v:"P20〜25（第6回）・漢字テスト5"},
+    {s:"国語サーパス 宿題",v:"P30〜33（第6回）"},
+   ],kanji:"漢字テスト5の範囲"},
+  {id:"w0413",label:"4月13日〜19日",cats:["sansu","kokugo"],test:false,kyukou:false,
+   rows:[
+    {s:"算数テキスト 予習",v:"P66,67（第11回）／P72,73（第12回）"},
+    {s:"算数テキスト 宿題",v:"P71（第11回）／P76（第12回）"},
+    {s:"算数新演習 宿題",v:"P28〜31（第6回）"},
+    {s:"国語エフォート 宿題",v:"P34〜39（第7回）・漢字テスト6"},
+    {s:"国語サーパス 宿題",v:"P34〜37（第7回）"},
+   ],kanji:"漢字テスト6の範囲"},
+  {id:"w0420",label:"4月20日〜26日",cats:["sansu","kokugo"],test:false,kyukou:false,
+   rows:[
+    {s:"算数テキスト 予習",v:"P78,79（第13回）／P84,85（第14回）"},
+    {s:"算数テキスト 宿題",v:"P83（第13回）／P89（第14回）"},
+    {s:"算数新演習 宿題",v:"P32〜35（第7回）"},
+    {s:"国語エフォート 宿題",v:"P34〜39（第7回）・漢字テスト6"},
+    {s:"国語サーパス 宿題",v:"P34〜37（第7回）"},
+   ],kanji:"漢字テスト6の範囲"},
+  {id:"w0427",label:"4月27日〜5月3日",cats:[],test:false,kyukou:true,
+   rows:[{s:"全教科",v:"休講（授業・宿題なし）\n算数新演習P36〜43・国語サーパスP38〜43は自習期間"}],kanji:null},
+  {id:"w0504",label:"5月4日〜10日",cats:["sansu","kokugo"],test:false,kyukou:false,notice:"提出日：5/11・5/17",
+   rows:[
+    {s:"算数テキスト 予習",v:"P90,91（第15回）／P96,97（第16回）"},
+    {s:"算数テキスト 宿題",v:"P95（第15回）／P101（第16回）"},
+    {s:"算数新演習 宿題",v:"P44〜47（第8回）"},
+    {s:"国語エフォート 宿題",v:"P26〜29（第8回）・漢字テスト7"},
+    {s:"国語サーパス 宿題",v:"P44〜51（第8回）"},
+   ],kanji:"漢字テスト7の範囲"},
+  {id:"w0511",label:"5月11日〜17日",cats:[],test:true,kyukou:false,
+   rows:[{s:"統一テスト②",v:"算数新演習P48〜51\n国語サーパスP52〜55"}],kanji:null},
+  {id:"w0518",label:"5月18日〜24日",cats:["sansu","kokugo"],test:false,kyukou:false,
+   rows:[
+    {s:"算数テキスト 予習",v:"P102,103（第17回）／P108,109（第18回）"},
+    {s:"算数テキスト 宿題",v:"P107（第17回）／P113（第18回）"},
+    {s:"算数新演習 宿題",v:"P52〜55（第9回）"},
+    {s:"国語エフォート 宿題",v:"P46〜53（第9回）・漢字テスト8"},
+    {s:"国語サーパス 宿題",v:"P56〜59（第9回）"},
+   ],kanji:"漢字テスト8の範囲"},
+  {id:"w0525",label:"5月25日〜31日",cats:["sansu","kokugo"],test:false,kyukou:false,
+   rows:[
+    {s:"算数テキスト 予習",v:"P114,115（第19回）／P120,121（第20回）"},
+    {s:"算数テキスト 宿題",v:"P119（第19回）／P125（第20回）"},
+    {s:"算数新演習 宿題",v:"P56〜59（第10回）"},
+    {s:"国語エフォート 宿題",v:"P54〜59（第10回）・漢字テスト9"},
+    {s:"国語サーパス 宿題",v:"P60〜63（第10回）"},
+   ],kanji:"漢字テスト9の範囲"},
+  {id:"w0601",label:"6月1日〜7日",cats:["sansu","kokugo"],test:false,kyukou:false,
+   rows:[
+    {s:"算数テキスト 予習",v:"P126,127（第21回）／P132,133（第22回）"},
+    {s:"算数テキスト 宿題",v:"P131（第21回）／P137（第22回）"},
+    {s:"算数新演習 宿題",v:"P60〜65（第11回）"},
+    {s:"国語エフォート 宿題",v:"P192〜195（第11回・詩歌）・漢字テスト10"},
+    {s:"国語サーパス 宿題",v:"P64〜69（第11回）"},
+   ],kanji:"漢字テスト10の範囲"},
+  {id:"w0608",label:"6月8日〜14日",cats:[],test:false,kyukou:true,
+   rows:[{s:"全教科",v:"休講（授業・宿題なし）\n算数新演習P66〜71・国語サーパスP70〜75は自習期間"}],kanji:null},
+  {id:"w0615",label:"6月15日〜21日",cats:["sansu","kokugo"],test:false,kyukou:false,notice:"提出日：6/15・6/21",
+   rows:[
+    {s:"算数テキスト 予習",v:"P138,139（第23回）／P144,145（第24回）"},
+    {s:"算数テキスト 宿題",v:"P143（第23回）／P149（第24回）"},
+    {s:"算数新演習 宿題",v:"P72〜75（第12回）"},
+    {s:"国語エフォート 宿題",v:"P60〜65（第12回）・漢字テスト11"},
+    {s:"国語サーパス 宿題",v:"P76〜79（第12回）"},
+   ],kanji:"漢字テスト11の範囲"},
+  {id:"w0622",label:"6月22日〜28日",cats:["sansu","kokugo"],test:false,kyukou:false,
+   rows:[
+    {s:"算数テキスト 予習",v:"P150,151（第25回）／P156,157（第26回）"},
+    {s:"算数テキスト 宿題",v:"P155（第25回）／P161（第26回）"},
+    {s:"算数新演習 宿題",v:"P76〜81（第13回）"},
+    {s:"国語エフォート 宿題",v:"P66〜73（第13回）・漢字テスト12"},
+    {s:"国語サーパス 宿題",v:"P80〜83（第13回）"},
+   ],kanji:"漢字テスト12の範囲"},
+  {id:"w0629",label:"6月29日〜7月5日",cats:["sansu","kokugo"],test:false,kyukou:false,notice:"提出日：7/6・7/9",
+   rows:[
+    {s:"算数テキスト 予習",v:"P162,163（第27回）／P168,169（第28回）"},
+    {s:"算数テキスト 宿題",v:"P167（第27回）／P173（第28回）"},
+    {s:"算数新演習 宿題",v:"P82〜85（第14回）"},
+    {s:"国語エフォート 宿題",v:"P74〜79（第14回）・漢字テスト13"},
+    {s:"国語サーパス 宿題",v:"P84〜87（第14回）"},
+   ],kanji:"漢字テスト13の範囲"},
+  {id:"w0706",label:"7月6日〜12日",cats:[],test:true,kyukou:false,
+   rows:[{s:"統一テスト③",v:"算数新演習P86〜89\n国語サーパスP88〜93"}],kanji:null},
+  {id:"w0713",label:"7月13日〜19日",cats:["sansu","kokugo"],test:false,kyukou:false,
+   rows:[
+    {s:"算数テキスト 予習",v:"P174,175（第29回）／P180,181（第30回）"},
+    {s:"算数テキスト 宿題",v:"P179（第29回）／P185（第30回）"},
+    {s:"算数新演習 宿題",v:"P90（第15回）"},
+    {s:"国語エフォート 宿題",v:"P80〜87（第15回）・漢字テスト14"},
+    {s:"国語サーパス 宿題",v:"P94〜97（第15回）"},
+   ],kanji:"漢字テスト14の範囲"},
+  {id:"w0720",label:"7月20日〜26日",cats:["sansu","kokugo"],test:false,kyukou:false,
+   rows:[
+    {s:"算数テキスト 予習",v:"P186,187（第31回）／P192,193（第32回）"},
+    {s:"算数テキスト 宿題",v:"P191（第31回）／P197（第32回）"},
+    {s:"算数新演習 宿題",v:"P91〜97（第16回）"},
+    {s:"国語エフォート 宿題",v:"（第16回：宿題欄記載なし）・漢字テスト15"},
+    {s:"国語サーパス 宿題",v:"P98〜101（第16回）"},
+   ],kanji:"漢字テスト15の範囲"},
+  {id:"w0727",label:"7月27日〜8月2日",cats:["sansu","kokugo"],test:false,kyukou:false,notice:"提出日：8/16",
+   rows:[
+    {s:"算数テキスト 予習",v:"P198,199（第33回）／P204,205（第34回）"},
+    {s:"算数テキスト 宿題",v:"P203（第33回）／P211（第34回）"},
+    {s:"算数新演習 宿題",v:"P98〜101（第17回）"},
+    {s:"国語エフォート 宿題",v:"P102〜111（第17回）・漢字テスト16"},
+    {s:"国語サーパス 宿題",v:"（第17回：ページ未記載）"},
+   ],kanji:"漢字テスト16の範囲"},
+  {id:"w0803",label:"8月3日〜9日",cats:[],test:false,kyukou:true,
+   rows:[{s:"全教科",v:"休講（授業・宿題なし）\n算数新演習P102〜109は自習期間"}],kanji:null},
+  {id:"w0810",label:"8月10日〜16日",cats:[],test:true,kyukou:false,
+   rows:[{s:"統一テスト④",v:"算数新演習P110〜117"}],kanji:null},
+  {id:"w0817",label:"8月17日〜23日",cats:["sansu","kokugo"],test:false,kyukou:false,notice:"提出日：9/7・9/13",
+   rows:[
+    {s:"算数テキスト",v:"（後半テキスト未配布）"},
+    {s:"算数新演習 宿題",v:"P118〜125（第18回）"},
+    {s:"国語エフォート 宿題",v:"P94〜101（第18回）・漢字テスト17"},
+    {s:"国語サーパス 宿題",v:"（第18回：ページ未記載）"},
+   ],kanji:"漢字テスト17の範囲"},
+  {id:"w0824",label:"8月24日〜30日",cats:["sansu","kokugo"],test:false,kyukou:false,notice:"提出日：9/7・9/13",
+   rows:[
+    {s:"算数テキスト",v:"（後半テキスト未配布）"},
+    {s:"算数新演習 宿題",v:"P126〜133（第19回）"},
+    {s:"国語エフォート 宿題",v:"P112〜117（第19回）・漢字テスト18"},
+    {s:"国語サーパス 宿題",v:"（第19回：ページ未記載）"},
+   ],kanji:"漢字テスト18の範囲"},
+  {id:"w0831",label:"8月31日〜9月6日",cats:["sansu","kokugo"],test:false,kyukou:false,notice:"提出日：9/7・9/13",
+   rows:[
+    {s:"算数テキスト",v:"（後半テキスト未配布）"},
+    {s:"算数新演習 宿題",v:"P126〜137（第20回）"},
+    {s:"国語エフォート 宿題",v:"P118〜125（第20回）・漢字テスト19"},
+    {s:"国語サーパス 宿題",v:"P102〜105（第20回）"},
+   ],kanji:"漢字テスト19の範囲"},
+  {id:"w0907",label:"9月7日〜13日",cats:[],test:true,kyukou:false,
+   rows:[{s:"統一テスト⑤",v:"算数新演習P134〜141\n国語サーパスP106〜109"}],kanji:null},
+  {id:"w0914",label:"9月14日〜20日",cats:["sansu","kokugo"],test:false,kyukou:false,
+   rows:[
+    {s:"算数テキスト",v:"（後半テキスト未配布）"},
+    {s:"算数新演習 宿題",v:"P138〜151（第21回）"},
+    {s:"国語エフォート 宿題",v:"P126〜133（第21回）・漢字テスト20"},
+    {s:"国語サーパス 宿題",v:"P106〜113（第21回）"},
+   ],kanji:"漢字テスト20の範囲"},
+  {id:"w0921",label:"9月21日〜27日",cats:[],test:false,kyukou:true,
+   rows:[{s:"全教科",v:"休講（授業・宿題なし）\n算数新演習P152〜155・国語サーパスP110〜117は自習期間"}],kanji:null},
+  {id:"w0928",label:"9月28日〜10月4日",cats:["sansu","kokugo"],test:false,kyukou:false,notice:"提出日：10/12・10/18",
+   rows:[
+    {s:"算数テキスト",v:"（後半テキスト未配布）"},
+    {s:"算数新演習 宿題",v:"P152〜159（第22回）"},
+    {s:"国語エフォート 宿題",v:"P134〜141（第22回）・漢字テスト21"},
+    {s:"国語サーパス 宿題",v:"P114〜123（第22回）"},
+   ],kanji:"漢字テスト21の範囲"},
+  {id:"w1005",label:"10月5日〜11日",cats:["sansu","kokugo"],test:false,kyukou:false,notice:"提出日：10/12・10/18",
+   rows:[
+    {s:"算数テキスト",v:"（後半テキスト未配布）"},
+    {s:"算数新演習 宿題",v:"P156〜165（第23回）"},
+    {s:"国語エフォート 宿題",v:"P142〜151（第23回）・漢字テスト22"},
+    {s:"国語サーパス 宿題",v:"P124〜131（第23回）"},
+   ],kanji:"漢字テスト22の範囲"},
+  {id:"w1012",label:"10月12日〜18日",cats:[],test:true,kyukou:false,
+   rows:[{s:"統一テスト⑥",v:"算数新演習P160〜169\n国語サーパスP132〜137"}],kanji:null},
+  {id:"w1019",label:"10月19日〜25日",cats:["sansu","kokugo"],test:false,kyukou:false,notice:"提出日：11/2・11/8",
+   rows:[
+    {s:"算数テキスト",v:"（後半テキスト未配布）"},
+    {s:"算数新演習 宿題",v:"P166〜173（第24回）"},
+    {s:"国語エフォート 宿題",v:"P152〜157（第24回）・漢字テスト23"},
+    {s:"国語サーパス 宿題",v:"P138〜143（第24回）"},
+   ],kanji:"漢字テスト23の範囲"},
+  {id:"w1026",label:"10月26日〜11月1日",cats:["sansu","kokugo"],test:false,kyukou:false,notice:"提出日：11/2・11/8",
+   rows:[
+    {s:"算数テキスト",v:"（後半テキスト未配布）"},
+    {s:"算数新演習 宿題",v:"P170〜179（第25回）"},
+    {s:"国語エフォート 宿題",v:"P158〜165（第25回）・漢字テスト24"},
+    {s:"国語サーパス 宿題",v:"（第25回：ページ未記載）"},
+   ],kanji:"漢字テスト24の範囲"},
+  {id:"w1102",label:"11月2日〜8日",cats:[],test:true,kyukou:false,
+   rows:[{s:"統一テスト⑦",v:"算数新演習P174〜183\n国語サーパス（ページ未記載）"}],kanji:null},
+  {id:"w1109",label:"11月9日〜15日",cats:["sansu","kokugo"],test:false,kyukou:false,notice:"提出日：11/30・12/6",
+   rows:[
+    {s:"算数テキスト",v:"（後半テキスト未配布）"},
+    {s:"算数新演習 宿題",v:"P184〜187（第26回）"},
+    {s:"国語エフォート 宿題",v:"P166〜173（第26回）・漢字テスト25"},
+    {s:"国語サーパス 宿題",v:"（第26回：ページ未記載）"},
+   ],kanji:"漢字テスト25の範囲"},
+  {id:"w1116",label:"11月16日〜22日",cats:["sansu","kokugo"],test:false,kyukou:false,notice:"提出日：11/30・12/6",
+   rows:[
+    {s:"算数テキスト",v:"（後半テキスト未配布）"},
+    {s:"算数新演習 宿題",v:"P188〜197（第27回）"},
+    {s:"国語エフォート 宿題",v:"P202〜207（第27回）・漢字テスト26"},
+    {s:"国語サーパス 宿題",v:"（第27回：ページ未記載）"},
+   ],kanji:"漢字テスト26の範囲"},
+  {id:"w1123",label:"11月23日〜29日",cats:["sansu","kokugo"],test:false,kyukou:false,notice:"提出日：11/30・12/6",
+   rows:[
+    {s:"算数テキスト",v:"（後半テキスト未配布）"},
+    {s:"算数新演習 宿題",v:"P198〜207（第28回）"},
+    {s:"国語エフォート 宿題",v:"P182〜189（第28回）・漢字テスト27"},
+    {s:"国語サーパス 宿題",v:"（第28回：ページ未記載）"},
+   ],kanji:"漢字テスト27の範囲"},
+  {id:"w1130",label:"11月30日〜12月6日",cats:[],test:true,kyukou:false,
+   rows:[{s:"統一テスト⑧",v:"算数新演習P202〜207\n国語エフォート：漢字テスト28"}],kanji:null},
+  {id:"w1207",label:"12月7日〜13日",cats:["kokugo"],test:false,kyukou:false,
+   rows:[
+    {s:"算数テキスト",v:"（後半テキスト未配布）"},
+    {s:"国語エフォート 宿題",v:"P174〜181（第29回）・漢字テスト28"},
+   ],kanji:"漢字テスト28の範囲"},
+  {id:"w1220",label:"12月20日",cats:["kokugo"],test:false,kyukou:false,
+   rows:[{s:"国語エフォート 宿題",v:"P214〜221（第30回・総合演習⑥）"}],kanji:null},
+  {id:"w1227",label:"12月27日（特別）",cats:["kokugo"],test:false,kyukou:false,
+   rows:[{s:"国語エフォート",v:"特別授業（宿題詳細は授業にて確認）"}],kanji:null},
+];
+
+function getItems(d){
+  const items=[...d.rows.map((r,i)=>({key:`${d.id}_r${i}`,s:r.s,v:r.v,extra:false}))];
+  if(!d.kyukou&&!d.test){
+    const kv=d.kanji?d.kanji:'今週の漢字テスト範囲';
+    items.push({key:`${d.id}_kanji`,s:'漢字ノート',v:kv+'を練習',extra:true});
+    items.push({key:`${d.id}_naoshi`,s:'なおしノート',v:'前回テスト・宿題の間違い直し',extra:true});
+  }
+  return items;
+}
+
+function tags(d){
+  if(d.test) return '<span class="tg tt">統一テスト</span>';
+  if(d.kyukou) return '<span class="tg ty">休講</span>';
+  let h='';
+  if(d.cats.includes('sansu')) h+='<span class="tg ts">算数</span>';
+  if(d.cats.includes('kokugo')) h+='<span class="tg tk">国語</span>';
+  return h;
+}
+
+function updateProgress(){
+  let total=0,done=0;
+  data.forEach(d=>getItems(d).forEach(it=>{total++;if(checks[it.key])done++;}));
+  const pct=total?Math.round(done/total*100):0;
+  document.getElementById('prog-fill').style.width=pct+'%';
+  document.getElementById('prog-text').textContent=done+' / '+total+' 完了';
+}
+
+function updateHeader(d){
+  const items=getItems(d);
+  const allDone=items.length>0&&items.every(it=>checks[it.key]);
+  const doneCnt=items.filter(it=>checks[it.key]).length;
+  const wh=document.getElementById('wh-'+d.id);
+  if(wh){allDone?wh.classList.add('all-done'):wh.classList.remove('all-done');}
+  const badge=document.getElementById('badge-'+d.id);
+  if(badge){
+    if(allDone){badge.className='done-badge';badge.textContent='完了';}
+    else if(doneCnt>0){badge.className='remain-badge';badge.textContent=(items.length-doneCnt)+'件残り';}
+    else{badge.className='remain-badge';badge.textContent='未着手';}
+  }
+}
+
+function toggleCheck(key,wid){
+  checks[key]=!checks[key];
+  save();
+  const btn=document.getElementById('ck-'+key);
+  if(btn){btn.classList.toggle('done',checks[key]);btn.textContent=checks[key]?'✓':'';}
+  const row=document.getElementById('row-'+key);
+  if(row)row.classList.toggle('checked',checks[key]);
+  const d=data.find(x=>x.id===wid);
+  if(d)updateHeader(d);
+  updateProgress();
+  if(currentFilter==='remaining')render(currentFilter);
+}
+
+let currentFilter='all';
+
+function render(f){
+  currentFilter=f;
+  const c=document.getElementById('wc');
+  c.innerHTML='';
+  let lastMonth='';
+  data.forEach(d=>{
+    if(f==='sansu'&&!d.cats.includes('sansu'))return;
+    if(f==='kokugo'&&!d.cats.includes('kokugo'))return;
+    const items=getItems(d);
+    if(f==='remaining'&&items.every(it=>checks[it.key]))return;
+    const month=d.label.match(/^(\d+月)/)?.[1]||'';
+    if(month&&month!==lastMonth&&f==='all'){
+      const ml=document.createElement('div');
+      ml.className='section-label';ml.textContent='── '+month;
+      c.appendChild(ml);lastMonth=month;
+    }
+    const allDone=items.length>0&&items.every(it=>checks[it.key]);
+    const doneCnt=items.filter(it=>checks[it.key]).length;
+    let badgeHtml='';
+    if(allDone)badgeHtml=`<span class="done-badge" id="badge-${d.id}">完了</span>`;
+    else if(doneCnt>0)badgeHtml=`<span class="remain-badge" id="badge-${d.id}">${items.length-doneCnt}件残り</span>`;
+    else badgeHtml=`<span class="remain-badge" id="badge-${d.id}">未着手</span>`;
+    const rowsHtml=items.map(it=>`
+      <div class="item-row${it.extra?' extra':''}${checks[it.key]?' checked':''}" id="row-${it.key}">
+        <div class="cell"><span class="subj">${it.s}</span><span class="val">${it.v.replace(/\n/g,'<br>')}</span></div>
+        <div class="check-cell">
+          <div class="ck${checks[it.key]?' done':''}" id="ck-${it.key}" onclick="toggleCheck('${it.key}','${d.id}')">${checks[it.key]?'✓':''}</div>
+        </div>
+      </div>`).join('');
+    const notice=d.notice?`<div class="notice">📌 ${d.notice}</div>`:'';
+    const el=document.createElement('div');
+    el.className='week';
+    el.innerHTML=`
+      <div class="wh${allDone?' all-done':''}" id="wh-${d.id}" onclick="tog('${d.id}')">
+        <div class="wdate">${d.label}</div>
+        <div class="wtags">${tags(d)}${badgeHtml}</div>
+        <span class="chev" id="cv-${d.id}">▼</span>
+      </div>
+      <div class="wb" id="bd-${d.id}">
+        <div class="col-head"><span>教材・内容</span><span class="ch-head">完了</span></div>
+        ${rowsHtml}${notice}
+      </div>`;
+    c.appendChild(el);
+  });
+  updateProgress();
+}
+
+function tog(id){
+  const b=document.getElementById('bd-'+id);
+  const v=document.getElementById('cv-'+id);
+  const o=b.classList.toggle('open');
+  v.style.transform=o?'rotate(180deg)':'';
+}
+
+function fil(f,btn){
+  document.querySelectorAll('.fb').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  render(f);
+}
+
+render('all');
+</script>
+</body>
+</html>
